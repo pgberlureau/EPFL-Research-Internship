@@ -1,10 +1,14 @@
 
-from torch import manual_seed, zeros, device, autograd
+from torch import manual_seed, zeros, device
 from torch.optim import AdamW
 from torch.nn import CrossEntropyLoss
 from torch.cuda import is_available
 from torch_geometric.loader import DataLoader
 import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import numpy as np
+
 
 from models.custom_gnn import Custom_GNN
 from tasks.barbell import BarbellDataset
@@ -90,9 +94,8 @@ def benchmark(models, dataset, ns):
     mu_with_features = dataset in ['RingDataset']
 
     dev = device('cuda' if is_available() else 'cpu')
-    #autograd.set_detect_anomaly(True)
 
-    train_size = int(2**13)
+    train_size = int(2**13) 
     val_size = int(2**10)
     test_size = int(2**10)
 
@@ -102,7 +105,7 @@ def benchmark(models, dataset, ns):
 
     batch_size = 64
 
-    results = zeros((len(models), len(ns), 10))
+    results = zeros((len(models), len(ns), 10)) 
     for n in ns:
         print(f"Starting n={n}")
         for run in range(10):
@@ -122,20 +125,36 @@ def benchmark(models, dataset, ns):
                                    model=model_name,
                                    mu_with_features=mu_with_features).to(dev)
                 
-                losses, train_accuracies, val_accuracies, test_accuracy = train(model, train_loader, val_loader, test_loader, dev)
+                _, _, _, test_accuracy = train(model, train_loader, val_loader, test_loader, dev)
                 print(f'Model: {model_name}, Dataset: {dataset}, Test Acc: {test_accuracy:.4f}')
                 results[models.index(model_name), ns.index(n), run] = test_accuracy
 
-        #plot test_accuracy with respect to n for each model (contained in results)
-        plt.figure(figsize=(10, 6))
-        for i, model_name in enumerate(models):
-            plt.plot(ns, results[i].mean(dim=-1), label=model_name)
-        plt.xlabel('n')
-        plt.ylabel('Test Accuracy')
-        plt.title(f'Test Accuracy vs n for {dataset}')
-        plt.legend()
-        plt.savefig(f'{dataset}_test_accuracy.png')
-        plt.close()
+    # Example DataFrame
+    df = pd.DataFrame({
+        'layers': ns*len(models),
+        'accuracy': results.mean(dim=-1).flatten().tolist(),
+        'gnn_model': [model for model in models for _ in ns]
+    })
+
+    # Set Seaborn style
+    sns.set(style='whitegrid', context='talk', palette='colorblind')
+    plt.figure(figsize=(7,5))
+
+    # Line plot with shaded standard deviation
+    sns.lineplot(
+        data=df,
+        x='layers',
+        y='accuracy',
+        hue='gnn_model',
+        linewidth=2
+    )
+
+    plt.xlabel('GNN layers')
+    plt.ylabel('Test Accuracy')
+    plt.title('Test Accuracy vs GNN layers')
+    plt.legend(title='GNN Model')
+    plt.tight_layout()
+    plt.savefig(f'{dataset}.png', dpi=300)
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description="Benchmark GNN models on various datasets.")

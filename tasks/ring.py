@@ -1,4 +1,4 @@
-from torch import randn, randint, zeros, bool, tensor
+from torch import randn, randint, zeros, bool
 from torch_geometric.data import Dataset
 from torch_geometric.utils import from_networkx
 from networkx import cycle_graph
